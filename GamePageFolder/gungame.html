@@ -1,0 +1,113 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>3D Gun Cursor</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+
+<script>
+  // Scene setup
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer({antialias: true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  // Gun (just a box)
+  const gunGeometry = new THREE.BoxGeometry(1, 0.5, 2);
+  const gunMaterial = new THREE.MeshBasicMaterial({ color: 0x2222ff });
+  const gun = new THREE.Mesh(gunGeometry, gunMaterial);
+  scene.add(gun);
+
+  // Enemy (red cube)
+  const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
+  const enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+  const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+  scene.add(enemy);
+  enemy.position.set(2, 1, -5);
+
+  // Random target for enemy
+  let enemyTarget = new THREE.Vector3();
+  function setNewEnemyTarget() {
+    enemyTarget.set(
+      (Math.random() - 0.5) * 6,  // x range
+      (Math.random() - 0.5) * 4,  // y range
+      -5                          // fixed z to stay far back
+    );
+    setTimeout(setNewEnemyTarget, 2000); // Change target every 2 seconds
+  }
+  setNewEnemyTarget();
+
+  // Move camera back
+  camera.position.z = 5;
+
+  // Track mouse position
+  let mouseX = 0, mouseY = 0;
+  document.addEventListener('mousemove', e => {
+    mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+    mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+  });
+
+  // Array to store bullets
+  const bullets = [];
+
+  // Shooting bullets
+  document.addEventListener('click', () => {
+    const bulletGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+    const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+
+    bullet.position.copy(gun.position);
+    bullet.rotation.copy(gun.rotation);
+
+    const dir = new THREE.Vector3(mouseX, mouseY, 1).unproject(camera).sub(camera.position).normalize();
+    bullets.push({mesh: bullet, direction: dir});
+    scene.add(bullet);
+  });
+
+  // Resize handling
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // Animate
+  function animate() {
+    requestAnimationFrame(animate);
+
+    // Gun rotation based on mouse
+    const gunX = mouseX * 0.5;
+    const gunY = mouseY * 0.5;
+    gun.rotation.y = gunX;
+    gun.rotation.x = -gunY;
+
+    // Gun stays at bottom middle
+    gun.position.set(0, -1.5, 0);
+
+    // Move bullets
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const bullet = bullets[i];
+      bullet.mesh.position.add(bullet.direction.clone().multiplyScalar(0.2));
+      if (bullet.mesh.position.length() > 50) {
+        scene.remove(bullet.mesh);
+        bullets.splice(i, 1);
+      }
+    }
+
+    // Move enemy slowly toward its random target
+    enemy.position.lerp(enemyTarget, 0.01);
+
+    renderer.render(scene, camera);
+  }
+
+  animate();
+</script>
+</body>
+</html>
